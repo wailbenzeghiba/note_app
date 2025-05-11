@@ -5,31 +5,9 @@ require '../includes/auth.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $emotion = $_POST['emotion'] ?: '📝';
 
-    // Handle image upload
-    $photo = null;
-    if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
-        // Define upload directory
-        $uploadDir = '../uploads/';
-        
-        // Get file details
-        $fileName = $_FILES['photo']['name'];
-        $fileTmpPath = $_FILES['photo']['tmp_name'];
-        $fileExtension = pathinfo($fileName, PATHINFO_EXTENSION);
-
-        // Generate a unique name for the file to avoid collisions
-        $newFileName = uniqid('note_', true) . '.' . $fileExtension;
-
-        // Move the file to the uploads directory
-        $destinationPath = $uploadDir . $newFileName;
-        move_uploaded_file($fileTmpPath, $destinationPath);
-
-        // Store the new file name in the $photo variable
-        $photo = $newFileName;
-    }
-
-    // Insert the note into the database
-    $stmt = $pdo->prepare("INSERT INTO notes (user_id, title, content, emotion, photo) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$_SESSION['user_id'], $_POST['title'], $_POST['content'], $emotion, $photo]);
+    // Insert the note into the database, excluding the photo column
+    $stmt = $pdo->prepare("INSERT INTO notes (user_id, title, content, emotion) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$_SESSION['user_id'], $_POST['title'], $_POST['content'], $emotion]);
 
     // Redirect after saving the note
     header("Location: ../dashboard.php");
@@ -152,9 +130,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <input name="title" required placeholder="Title">
     <textarea name="content" placeholder="Write your note here..."></textarea>
-
-    <!-- Image upload input -->
-    <input type="file" name="photo" accept="image/*">
 
     <button type="submit">Save</button>
 </form>

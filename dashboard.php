@@ -176,6 +176,7 @@ $notes = $stmt->fetchAll();
     <h2>📒 Your Notes</h2>
     <div>
         <a class="add-note" href="notes/add.php">+ Add Note</a>
+        <a class="add-note" href="chat.php">💬 Chat</a>
         <a href="logout.php">Logout</a>
     </div>
 </header>
@@ -196,6 +197,7 @@ $notes = $stmt->fetchAll();
             <?php endif; ?>
 
             <div class="note-actions">
+                <a href="notes/view.php?id=<?= $note['id'] ?>">👁️ View</a>
                 <a href="notes/edit.php?id=<?= $note['id'] ?>">✏️ Edit</a>
                 <a href="notes/delete.php?id=<?= $note['id'] ?>" onclick="return confirm('Delete this note?')">🗑️ Delete</a>
             </div>

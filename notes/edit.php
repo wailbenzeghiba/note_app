@@ -22,40 +22,10 @@ if (!$note) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $emotion = $_POST['emotion'] ?: '📝';
-    $photo = $note['photo']; // Keep the existing photo by default
 
-    // Handle image upload if it's provided
-    if (isset($_FILES['photo']) && $_FILES['photo']['error'] == 0) {
-        // Define the target directory for images
-        $target_dir = "../uploads/";
-        $target_file = $target_dir . basename($_FILES["photo"]["name"]);
-        $imageFileType = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
-
-        // Check if the file is an image
-        $check = getimagesize($_FILES["photo"]["tmp_name"]);
-        if ($check !== false) {
-            // Delete the old photo if a new one is uploaded
-            if ($note['photo']) {
-                $old_photo_path = $target_dir . $note['photo'];
-                if (file_exists($old_photo_path)) {
-                    unlink($old_photo_path);
-                }
-            }
-
-            // Move the file to the uploads folder and update the photo field
-            if (move_uploaded_file($_FILES["photo"]["tmp_name"], $target_file)) {
-                $photo = basename($_FILES["photo"]["name"]);
-            } else {
-                echo "Sorry, there was an error uploading your file.";
-            }
-        } else {
-            echo "File is not an image.";
-        }
-    }
-
-    // Update the note with the new details (including new photo if uploaded)
-    $stmt = $pdo->prepare("UPDATE notes SET title = ?, content = ?, emotion = ?, photo = ? WHERE id = ? AND user_id = ?");
-    $stmt->execute([$_POST['title'], $_POST['content'], $emotion, $photo, $note_id, $_SESSION['user_id']]);
+    // Update the note with the new details
+    $stmt = $pdo->prepare("UPDATE notes SET title = ?, content = ?, emotion = ? WHERE id = ? AND user_id = ?");
+    $stmt->execute([$_POST['title'], $_POST['content'], $emotion, $note_id, $_SESSION['user_id']]);
 
     header("Location: ../dashboard.php");
     exit;
@@ -127,8 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         input[name="title"],
-        textarea,
-        input[name="photo"] {
+        textarea {
             width: 100%;
             font-size: 1.1rem;
             padding: 0.6rem;
@@ -158,23 +127,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         button:hover {
             background-color: #fff4a3;
         }
-
-        /* Image preview style */
-        .image-preview {
-            margin-bottom: 1rem;
-        }
-
-        .image-preview img {
-            max-width: 100%;
-            height: auto;
-        }
     </style>
 </head>
 <body>
 
 <h2>📝 Edit Note</h2>
 
-<form method="POST" enctype="multipart/form-data">
+<form method="POST">
     <div class="emoji-trigger" id="emoji-trigger"><?= htmlspecialchars($note['emotion']) ?></div>
     <div class="emoji-options" id="emoji-options">
         <span>📝</span>
@@ -188,16 +147,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <input name="title" required placeholder="Title" value="<?= htmlspecialchars($note['title']) ?>">
     <textarea name="content" placeholder="Write your note here..."><?= htmlspecialchars($note['content']) ?></textarea>
-
-    <!-- Display existing photo if available -->
-    <?php if ($note['photo']): ?>
-        <div class="image-preview">
-            <img src="../uploads/<?= htmlspecialchars($note['photo']) ?>" alt="Current Image">
-        </div>
-    <?php endif; ?>
-
-    <!-- Add input for the new photo attachment -->
-    <input type="file" name="photo" accept="image/*" placeholder="Attach a new photo (optional)">
 
     <button type="submit">Update</button>
 </form>
