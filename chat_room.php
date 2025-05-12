@@ -143,7 +143,7 @@ if (!$chat_room) {
 </form>
 
 <!-- Add your WAV file -->
-<audio id="message-sound" src="sounds/random.wav" preload="auto"></audio>
+<audio id="message-sound" src="sounds/randomg.wav" preload="auto"></audio>
 
 <script>
 const chatBox = document.getElementById('chat-box');

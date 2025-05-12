@@ -4,11 +4,24 @@ require 'includes/auth.php';
 
 $user_id = $_SESSION['user_id'];
 
+// Update status if submitted
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['status'])) {
+    $allowed = ['online', 'offline', 'dnd'];
+    $status = in_array($_POST['status'], $allowed) ? $_POST['status'] : 'offline';
+    $stmt = $pdo->prepare("UPDATE users SET status = ? WHERE id = ?");
+    $stmt->execute([$status, $user_id]);
+}
+
+// Get current user status
+$stmt = $pdo->prepare("SELECT status FROM users WHERE id = ?");
+$stmt->execute([$user_id]);
+$current_status = $stmt->fetchColumn();
+
 // Handle user search
 $search_username = $_GET['search'] ?? '';
 $search_results = [];
 if ($search_username) {
-    $stmt = $pdo->prepare("SELECT id, username FROM users WHERE username LIKE ? AND id != ?");
+    $stmt = $pdo->prepare("SELECT id, username, status FROM users WHERE username LIKE ? AND id != ?");
     $stmt->execute(["%$search_username%", $user_id]);
     $search_results = $stmt->fetchAll();
 }
@@ -125,6 +138,13 @@ $rooms = $stmt->fetchAll();
 <header>
     <h2>💬 Chat</h2>
     <div>
+        <form method="post" style="display:inline; margin-right: 1rem;">
+            <select name="status" onchange="this.form.submit()">
+                <option value="online" <?= ($current_status == 'online') ? 'selected' : '' ?>>🟢 Online</option>
+                <option value="offline" <?= ($current_status == 'offline') ? 'selected' : '' ?>>⚫ Offline</option>
+                <option value="dnd" <?= ($current_status == 'dnd') ? 'selected' : '' ?>>🔴 Do Not Disturb</option>
+            </select>
+        </form>
         <a href="dashboard.php">📒 Notes</a>
         <a href="logout.php">Logout</a>
     </div>
@@ -140,8 +160,8 @@ $rooms = $stmt->fetchAll();
     <h3>Results:</h3>
     <ul class="search-results">
         <?php foreach ($search_results as $user): ?>
-            <li>
-                <?= htmlspecialchars($user['username']) ?>
+            <li id="user-status-<?= $user['id'] ?>">
+                <?= htmlspecialchars($user['username']) ?> <small>(<span class="status"><?= htmlspecialchars($user['status']) ?></span>)</small>
                 <button onclick="sendFriendRequest(<?= $user['id'] ?>)">Send Request</button>
             </li>
         <?php endforeach; ?>
@@ -171,16 +191,17 @@ $rooms = $stmt->fetchAll();
 <ul class="chat-rooms">
     <?php foreach ($rooms as $room): 
         $other_id = ($room['user1_id'] == $user_id) ? $room['user2_id'] : $room['user1_id'];
-        $stmtUser = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+        $stmtUser = $pdo->prepare("SELECT username, status FROM users WHERE id = ?");
         $stmtUser->execute([$other_id]);
         $other = $stmtUser->fetch();
     ?>
-        <li><a href="chat_room.php?room=<?= $room['id'] ?>">Chat with <?= htmlspecialchars($other['username']) ?></a></li>
+        <li id="user-status-<?= $other_id ?>">
+            <a href="chat_room.php?room=<?= $room['id'] ?>">Chat with <?= htmlspecialchars($other['username']) ?> <small>(<span class="status"><?= htmlspecialchars($other['status']) ?></span>)</small></a>
+        </li>
     <?php endforeach; ?>
 </ul>
 
 <script>
-// JavaScript function to handle friend request
 function sendFriendRequest(receiverId) {
     const formData = new FormData();
     formData.append('receiver_id', receiverId);
@@ -191,7 +212,6 @@ function sendFriendRequest(receiverId) {
     })
     .then(response => response.json())
     .then(data => {
-        // Alert the user based on the response message from the PHP backend
         alert(data.message);
     })
     .catch(error => {
@@ -199,6 +219,25 @@ function sendFriendRequest(receiverId) {
         alert('Something went wrong. Please try again.');
     });
 }
+
+function fetchUserStatuses() {
+    fetch('get_statuses.php')
+        .then(response => response.json())
+        .then(users => {
+            users.forEach(user => {
+                const el = document.getElementById('user-status-' + user.id);
+                if (el) {
+                    const statusSpan = el.querySelector('.status');
+                    if (statusSpan) {
+                        statusSpan.textContent = user.status;
+                    }
+                }
+            });
+        });
+}
+
+setInterval(fetchUserStatuses, 5000);
+window.addEventListener('load', fetchUserStatuses);
 </script>
 
 </body>

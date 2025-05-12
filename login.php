@@ -9,6 +9,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($user && password_verify($_POST['password'], $user['password'])) {
         $_SESSION['user_id'] = $user['id'];
+
+        // ✅ Set user status to 'online'
+        $stmt = $pdo->prepare("UPDATE users SET status = 'online' WHERE id = ?");
+        $stmt->execute([$user['id']]);
+
         header("Location: dashboard.php");
         exit;
     } else {
