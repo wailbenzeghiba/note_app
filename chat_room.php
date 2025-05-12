@@ -238,6 +238,26 @@ if (!$chat_room) {
             pointer-events: none;
             font-weight: bold;
         }
+
+        #memory-board {
+            display: grid;
+            grid-template-columns: repeat(4, 60px); /* 4 columns for 18 tiles */
+            grid-gap: 8px;
+            justify-content: center;
+            margin-bottom: 1.2rem;
+        }
+        #memory-board .ttt-cell {
+            width: 60px;
+            height: 60px;
+            font-size: 2rem;
+            text-align: center;
+            line-height: 60px;
+            border-radius: 10px;
+            border: 2px solid #e0c878;
+            background: #f9f6e3;
+            transition: background 0.2s;
+            user-select: none;
+        }
     </style>
 </head>
 <body>
@@ -264,6 +284,9 @@ if (!$chat_room) {
 <!-- Connect 4 Button -->
 <button id="start-connect4" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Connect 4</button>
 
+<!-- Memory Game Button -->
+<button id="start-memory" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Memory</button>
+
 <!-- Tic-Tac-Toe Overlay and Game -->
 <div id="ttt-overlay">
     <div id="tictactoe-container">
@@ -284,6 +307,18 @@ if (!$chat_room) {
         <div style="text-align:center;">
             <button id="connect4-restart" style="margin:18px 10px 0 10px; background-color:#fff4a3; border:2px solid #e0c878; color:#5a3b00; padding:0.5rem 1.2rem; border-radius:8px; font-weight:bold; box-shadow:2px 2px 3px rgba(0,0,0,0.08); cursor:pointer; font-size:1rem;">Restart Game</button>
             <button id="connect4-leave" style="margin:18px 10px 0 10px; background-color:#fff4a3; border:2px solid #e0c878; color:#5a3b00; padding:0.5rem 1.2rem; border-radius:8px; font-weight:bold; box-shadow:2px 2px 3px rgba(0,0,0,0.08); cursor:pointer; font-size:1rem;">Leave Game</button>
+        </div>
+    </div>
+</div>
+
+<!-- Memory Game Overlay -->
+<div id="memory-overlay" style="display:none; position:fixed; z-index:1000; left:0;top:0;right:0;bottom:0; background:rgba(255,255,200,0.3); justify-content:center; align-items:center;">
+    <div id="memory-container" style="background:#fffbe6; border:3px solid #e0c878; border-radius:18px; padding:2.5rem; min-width:420px; min-height:520px; display:flex; flex-direction:column; align-items:center;">
+        <div id="memory-board" style="display:grid; grid-template-columns:repeat(4,60px); grid-gap:8px; margin-bottom:1.2rem;"></div>
+        <div id="memory-message" style="text-align:center; margin-top:10px; font-size:1.2rem; color:#5a3b00; font-weight:bold; letter-spacing:1px;"></div>
+        <div style="text-align:center;">
+            <button id="memory-restart" style="margin:18px 10px 0 10px;">Restart Game</button>
+            <button id="memory-leave" style="margin:18px 10px 0 10px;">Leave Game</button>
         </div>
     </div>
 </div>
@@ -584,6 +619,174 @@ function makeConnect4Move(col) {
         renderConnect4();
     });
 }
+
+const startMemoryButton = document.getElementById('start-memory');
+const memoryOverlay = document.getElementById('memory-overlay');
+const memoryBoard = document.getElementById('memory-board');
+const memoryMessage = document.getElementById('memory-message');
+const memoryRestart = document.getElementById('memory-restart');
+const memoryLeave = document.getElementById('memory-leave');
+
+let memoryGame = null;
+let memoryInterval = null;
+
+startMemoryButton.addEventListener('click', () => {
+    document.body.querySelectorAll('header, #chat-box, #message-form, #start-tictactoe, #start-connect4, #start-memory').forEach(el => {
+        el.classList.add('blur-bg');
+    });
+    memoryOverlay.style.display = 'flex';
+    startMemoryButton.style.display = 'none';
+    fetchMemory();
+    if (memoryInterval) clearInterval(memoryInterval);
+    memoryInterval = setInterval(fetchMemory, 2000);
+});
+
+memoryRestart.addEventListener('click', () => {
+    fetch('memory_restart.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `room_id=${roomId}`
+    })
+    .then(res => res.json())
+    .then(() => {
+        fetchMemory();
+    });
+});
+
+memoryLeave.addEventListener('click', () => {
+    document.body.querySelectorAll('header, #chat-box, #message-form, #start-tictactoe, #start-connect4, #start-memory').forEach(el => {
+        el.classList.remove('blur-bg');
+    });
+    memoryOverlay.style.display = 'none';
+    startMemoryButton.style.display = '';
+    if (memoryInterval) clearInterval(memoryInterval);
+});
+
+function fetchMemory() {
+    fetch('memory_get.php?room_id=' + roomId)
+        .then(res => res.json())
+        .then(game => {
+            memoryGame = game;
+            renderMemory();
+        });
+}
+
+function renderMemory() {
+    if (!memoryGame) return;
+    memoryBoard.innerHTML = '';
+    const boardArr = memoryGame.board.split('');
+    const revealedArr = memoryGame.revealed.split('');
+    let revealedCount = 0;
+    // Render 20 cells (4x5 grid)
+    for (let i = 0; i < 20; i++) {
+        const cellDiv = document.createElement('div');
+        cellDiv.className = 'ttt-cell';
+        if (revealedArr[i] === '2') {
+            // Found pair: green background, bold, different border
+            cellDiv.textContent = boardArr[i];
+            cellDiv.style.backgroundColor = '#b6e7a0';
+            cellDiv.style.color = '#226600';
+            cellDiv.style.fontWeight = 'bold';
+            cellDiv.style.border = '2px solid #7fc97f';
+            cellDiv.style.boxShadow = '0 0 8px #b6e7a088';
+            revealedCount++;
+        } else if (revealedArr[i] === '1') {
+            // Currently revealed: yellow background
+            cellDiv.textContent = boardArr[i];
+            cellDiv.style.backgroundColor = '#fff4a3';
+            cellDiv.style.color = '#5a3b00';
+            cellDiv.style.fontWeight = 'bold';
+            revealedCount++;
+        } else if (typeof boardArr[i] !== 'undefined') {
+            cellDiv.textContent = '';
+            cellDiv.style.backgroundColor = '#f9f6e3';
+            if (memoryGame.current_player == userId && memoryGame.game_status === 'active') {
+                cellDiv.style.cursor = 'pointer';
+                cellDiv.onclick = () => makeMemoryMove(i);
+            } else {
+                cellDiv.style.cursor = 'default';
+                cellDiv.onclick = null;
+            }
+        } else {
+            cellDiv.style.backgroundColor = 'transparent';
+            cellDiv.style.border = 'none';
+            cellDiv.style.cursor = 'default';
+        }
+        memoryBoard.appendChild(cellDiv);
+    }
+
+    // --- Hints and status ---
+    if (memoryGame.game_status === 'active') {
+        let hint = '';
+        // Count how many cards are currently revealed for this turn
+        let turnRevealed = 0;
+        for (let i = 0; i < revealedArr.length; i++) {
+            if (
+                (memoryGame.current_player == memoryGame.player1_id && revealedArr[i] === '1') ||
+                (memoryGame.current_player == memoryGame.player2_id && revealedArr[i] === '1')
+            ) {
+                turnRevealed++;
+            }
+        }
+        if (memoryGame.current_player == userId) {
+            if (turnRevealed === 0) {
+                hint = "Pick a card to reveal.";
+            } else if (turnRevealed === 1) {
+                hint = "Pick another card to find a match.";
+            } else {
+                hint = "Wait for cards to flip or for your turn.";
+            }
+        } else {
+            hint = "Wait for your opponent to play.";
+        }
+        memoryMessage.textContent =
+            (memoryGame.current_player == userId ? "Your turn" : "Opponent's turn") +
+            ` | Score: You ${memoryGame.scores.split(',')[memoryGame.player1_id == userId ? 0 : 1]}, Opponent ${memoryGame.scores.split(',')[memoryGame.player1_id == userId ? 1 : 0]}` +
+            (hint ? " | Hint: " + hint : "");
+    } else if (memoryGame.game_status === 'won') {
+        memoryMessage.textContent = "Game over! " + (memoryGame.scores.split(',')[0] > memoryGame.scores.split(',')[1] ? "Player 1 wins!" : "Player 2 wins!");
+    } else if (memoryGame.game_status === 'tie') {
+        memoryMessage.textContent = "It's a tie!";
+    }
+}
+
+function makeMemoryMove(idx) {
+    fetch('memory_move.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `room_id=${roomId}&cell=${idx}`
+    })
+    .then(res => res.json())
+    .then(game => {
+        memoryGame = game;
+        renderMemory();
+    });
+}
+
+// --- Memory Game Overlay Buttons UI ---
+memoryRestart.style.backgroundColor = "#fff4a3";
+memoryRestart.style.border = "2px solid #e0c878";
+memoryRestart.style.color = "#5a3b00";
+memoryRestart.style.padding = "0.5rem 1.2rem";
+memoryRestart.style.borderRadius = "8px";
+memoryRestart.style.fontWeight = "bold";
+memoryRestart.style.boxShadow = "2px 2px 3px rgba(0,0,0,0.08)";
+memoryRestart.style.cursor = "pointer";
+memoryRestart.style.fontSize = "1rem";
+memoryRestart.onmouseover = () => memoryRestart.style.backgroundColor = "#ffec88";
+memoryRestart.onmouseout = () => memoryRestart.style.backgroundColor = "#fff4a3";
+
+memoryLeave.style.backgroundColor = "#fff4a3";
+memoryLeave.style.border = "2px solid #e0c878";
+memoryLeave.style.color = "#5a3b00";
+memoryLeave.style.padding = "0.5rem 1.2rem";
+memoryLeave.style.borderRadius = "8px";
+memoryLeave.style.fontWeight = "bold";
+memoryLeave.style.boxShadow = "2px 2px 3px rgba(0,0,0,0.08)";
+memoryLeave.style.cursor = "pointer";
+memoryLeave.style.fontSize = "1rem";
+memoryLeave.onmouseover = () => memoryLeave.style.backgroundColor = "#ffec88";
+memoryLeave.onmouseout = () => memoryLeave.style.backgroundColor = "#fff4a3";
 </script>
 
 </body>
@@ -600,3 +803,9 @@ $stmt = $pdo->prepare("DELETE FROM connect4_game WHERE room_id = ?");
 $stmt->execute([$room_id]);
 
 echo json_encode(['deleted' => true]);
+
+// memory_get.php (board creation part)
+$pairs = array_merge(range('A', 'I'), range('A', 'I')); // 9 pairs for 18 tiles
+shuffle($pairs);
+$board = implode('', $pairs);
+$revealed = str_repeat('0', 18);
