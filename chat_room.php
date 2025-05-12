@@ -219,6 +219,25 @@ if (!$chat_room) {
         #ttt-restart:hover, #ttt-leave:hover {
             background-color: #ffec88;
         }
+
+        .ttt-cell.playable {
+            outline: 2px solid #b6e7a0;
+            box-shadow: 0 0 6px #b6e7a088;
+            position: relative;
+            z-index: 1;
+        }
+        .ttt-cell.playable::after {
+            content: "▼";
+            color: #b6e7a0;
+            font-size: 1.1rem;
+            opacity: 0.7;
+            position: absolute;
+            top: -1.1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: none;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -242,6 +261,9 @@ if (!$chat_room) {
 <!-- Tic-Tac-Toe Button -->
 <button id="start-tictactoe" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Tic-Tac-Toe</button>
 
+<!-- Connect 4 Button -->
+<button id="start-connect4" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Connect 4</button>
+
 <!-- Tic-Tac-Toe Overlay and Game -->
 <div id="ttt-overlay">
     <div id="tictactoe-container">
@@ -250,6 +272,18 @@ if (!$chat_room) {
         <div style="text-align:center;">
             <button id="ttt-restart">Restart Game</button>
             <button id="ttt-leave">Leave Game</button>
+        </div>
+    </div>
+</div>
+
+<!-- Connect 4 Overlay and Game -->
+<div id="connect4-overlay" style="display:none; position:fixed; z-index:1000; left:0;top:0;right:0;bottom:0; background:rgba(255,255,200,0.3); justify-content:center; align-items:center;">
+    <div id="connect4-container" style="background:#fffbe6; border:3px solid #e0c878; border-radius:18px; padding:2.5rem; min-width:420px; min-height:520px; display:flex; flex-direction:column; align-items:center;">
+        <div id="connect4-board" style="display:grid; grid-template-columns:repeat(7,60px); grid-gap:8px; margin-bottom:1.2rem;"></div>
+        <div id="connect4-message" style="text-align:center; margin-top:10px; font-size:1.2rem; color:#5a3b00; font-weight:bold; letter-spacing:1px;"></div>
+        <div style="text-align:center;">
+            <button id="connect4-restart" style="margin:18px 10px 0 10px; background-color:#fff4a3; border:2px solid #e0c878; color:#5a3b00; padding:0.5rem 1.2rem; border-radius:8px; font-weight:bold; box-shadow:2px 2px 3px rgba(0,0,0,0.08); cursor:pointer; font-size:1rem;">Restart Game</button>
+            <button id="connect4-leave" style="margin:18px 10px 0 10px; background-color:#fff4a3; border:2px solid #e0c878; color:#5a3b00; padding:0.5rem 1.2rem; border-radius:8px; font-weight:bold; box-shadow:2px 2px 3px rgba(0,0,0,0.08); cursor:pointer; font-size:1rem;">Leave Game</button>
         </div>
     </div>
 </div>
@@ -357,7 +391,9 @@ function renderBoard() {
             tttMessage.textContent = "Waiting for opponent...";
         }
     } else if (tttGame.game_status === 'won') {
-        tttMessage.textContent = "Player " + tttGame.current_player + " wins!";
+        // Show the previous player as the winner
+        let winner = tttGame.current_player === 'X' ? 'O' : 'X';
+        tttMessage.textContent = "Player " + winner + " wins!";
     } else if (tttGame.game_status === 'tie') {
         tttMessage.textContent = "It's a tie!";
     }
@@ -411,7 +447,156 @@ messageForm.addEventListener('submit', function(e) {
 
 setInterval(fetchMessages, 2000);
 fetchMessages();
+
+const startConnect4Button = document.getElementById('start-connect4');
+const connect4Overlay = document.getElementById('connect4-overlay');
+const connect4Container = document.getElementById('connect4-container');
+const connect4Board = document.getElementById('connect4-board');
+const connect4Message = document.getElementById('connect4-message');
+const connect4Restart = document.getElementById('connect4-restart');
+const connect4Leave = document.getElementById('connect4-leave');
+
+let connect4Game = null;
+let connect4Interval = null;
+
+// Show Connect 4 UI and blur background
+startConnect4Button.addEventListener('click', () => {
+    document.body.querySelectorAll('header, #chat-box, #message-form, #start-tictactoe, #start-connect4').forEach(el => {
+        el.classList.add('blur-bg');
+    });
+    connect4Overlay.style.display = 'flex';
+    startConnect4Button.style.display = 'none';
+    fetchConnect4();
+    if (connect4Interval) clearInterval(connect4Interval);
+    connect4Interval = setInterval(fetchConnect4, 2000);
+});
+
+// Restart Connect 4
+connect4Restart.addEventListener('click', () => {
+    fetch('connect4_restart.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `room_id=${roomId}`
+    })
+    .then(res => res.json())
+    .then(() => {
+        fetchConnect4(); // This will trigger creation of a new game in 
+    });
+});
+
+// Leave Connect 4
+connect4Leave.addEventListener('click', () => {
+    document.body.querySelectorAll('header, #chat-box, #message-form, #start-tictactoe, #start-connect4').forEach(el => {
+        el.classList.remove('blur-bg');
+    });
+    connect4Overlay.style.display = 'none';
+    startConnect4Button.style.display = '';
+    if (connect4Interval) clearInterval(connect4Interval);
+});
+
+// Fetch Connect 4 game state
+function fetchConnect4() {
+    fetch('connect4_get.php?room_id=' + roomId)
+        .then(res => res.json())
+        .then(game => {
+            connect4Game = game;
+            renderConnect4();
+        });
+}
+
+// Render Connect 4 board and message
+function renderConnect4() {
+    if (!connect4Game) return;
+    connect4Board.innerHTML = '';
+    const boardArr = connect4Game.board.split('');
+    // Find the playable row for each column
+    let playableRows = Array(7).fill(-1);
+    for (let col = 0; col < 7; col++) {
+        for (let row = 5; row >= 0; row--) {
+            if ((boardArr[row * 7 + col] || ' ') === ' ') {
+                playableRows[col] = row;
+                break;
+            }
+        }
+    }
+    for (let row = 0; row < 6; row++) {
+        for (let col = 0; col < 7; col++) {
+            const idx = row * 7 + col;
+            const cell = boardArr[idx] || ' ';
+            const isPlayable = (row === playableRows[col]) &&
+                connect4Game.game_status === 'active' &&
+                (
+                    (connect4Game.current_player === 'R' && userId == connect4Game.player1_id) ||
+                    (connect4Game.current_player === 'Y' && userId == connect4Game.player2_id)
+                );
+            const cellDiv = document.createElement('div');
+            cellDiv.className = 'ttt-cell' + (cell.trim() ? ' taken' : '') + (isPlayable ? ' playable' : '');
+            cellDiv.style.backgroundColor = cell === 'R' ? '#ff6666' : cell === 'Y' ? '#ffe066' : '#f9f6e3';
+            cellDiv.textContent = '';
+            if (cell === 'R' || cell === 'Y') {
+                cellDiv.innerHTML = `<span style="font-size:2.2rem;">${cell === 'R' ? '🔴' : '🟡'}</span>`;
+            }
+            if (isPlayable) {
+                cellDiv.style.cursor = 'pointer';
+                cellDiv.onclick = () => makeConnect4Move(col);
+            } else {
+                cellDiv.style.cursor = 'default';
+                cellDiv.onclick = null;
+            }
+            connect4Board.appendChild(cellDiv);
+        }
+    }
+
+    // Always show the turn or winner message
+    if (connect4Game.game_status === 'active') {
+        let turnText = '';
+        if (connect4Game.current_player === 'R') {
+            turnText = (userId == connect4Game.player1_id) ? "Your turn (🔴)" : "Player 1's turn (🔴)";
+        } else {
+            turnText = (userId == connect4Game.player2_id) ? "Your turn (🟡)" : "Player 2's turn (🟡)";
+        }
+        connect4Message.textContent = turnText;
+    } else if (connect4Game.game_status === 'won') {
+        connect4Message.textContent = "Player " + (connect4Game.current_player === 'R' ? '🟡' : '🔴') + " wins!";
+    } else if (connect4Game.game_status === 'tie') {
+        connect4Message.textContent = "It's a tie!";
+    }
+}
+
+// Helper: get the lowest available row in a column
+function getAvailableRow(boardArr, col) {
+    for (let row = 5; row >= 0; row--) {
+        if ((boardArr[row * 7 + col] || ' ') === ' ') return row;
+    }
+    return -1;
+}
+
+// Make a move in Connect 4
+function makeConnect4Move(col) {
+    fetch('connect4_move.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `room_id=${roomId}&col=${col}`
+    })
+    .then(res => res.json())
+    .then(game => {
+        connect4Game = game;
+        renderConnect4();
+    });
+}
 </script>
 
 </body>
 </html>
+
+<?php
+require 'includes/db.php';
+
+$room_id = $_POST['room_id'] ?? null;
+if (!$room_id) { http_response_code(400); exit; }
+
+// Delete the game for this room
+$stmt = $pdo->prepare("DELETE FROM connect4_game WHERE room_id = ?");
+$stmt->execute([$room_id]);
+
+echo json_encode(['deleted' => true]);
