@@ -23,18 +23,48 @@ if ($user_id == $game['player2_id'] && $game['current_player'] === 'O') $symbol 
 if (!$symbol) { echo json_encode($game); exit; }
 
 // Make move if cell is empty
-$board = str_split($game['board']);
+$board = str_split(str_pad($game['board'], 25, ' '));
 if ($board[$cell] !== ' ') { echo json_encode($game); exit; }
 $board[$cell] = $symbol;
 
-// Check for win/tie
+// Check for win/tie (4 in a row, 5x5)
 function checkWin($b, $s) {
-    $w = [
-        [0,1,2],[3,4,5],[6,7,8],
-        [0,3,6],[1,4,7],[2,5,8],
-        [0,4,8],[2,4,6]
-    ];
-    foreach ($w as $c) if ($b[$c[0]]===$s && $b[$c[1]]===$s && $b[$c[2]]===$s) return true;
+    $size = 5;
+    $in_row = 4;
+    // Horizontal & Vertical
+    for ($i = 0; $i < $size; $i++) {
+        for ($j = 0; $j <= $size - $in_row; $j++) {
+            // Horizontal
+            $win = true;
+            for ($k = 0; $k < $in_row; $k++) {
+                if ($b[$i * $size + $j + $k] !== $s) $win = false;
+            }
+            if ($win) return true;
+            // Vertical
+            $win = true;
+            for ($k = 0; $k < $in_row; $k++) {
+                if ($b[($j + $k) * $size + $i] !== $s) $win = false;
+            }
+            if ($win) return true;
+        }
+    }
+    // Diagonals
+    for ($i = 0; $i <= $size - $in_row; $i++) {
+        for ($j = 0; $j <= $size - $in_row; $j++) {
+            // Main diagonal
+            $win = true;
+            for ($k = 0; $k < $in_row; $k++) {
+                if ($b[($i + $k) * $size + ($j + $k)] !== $s) $win = false;
+            }
+            if ($win) return true;
+            // Anti-diagonal
+            $win = true;
+            for ($k = 0; $k < $in_row; $k++) {
+                if ($b[($i + $k) * $size + ($j + $in_row - 1 - $k)] !== $s) $win = false;
+            }
+            if ($win) return true;
+        }
+    }
     return false;
 }
 $status = 'active';

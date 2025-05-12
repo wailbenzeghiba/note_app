@@ -145,14 +145,14 @@ if (!$chat_room) {
 
         .ttt-board {
             display: grid;
-            grid-template-columns: repeat(3, 90px);
-            grid-gap: 10px;
+            grid-template-columns: repeat(5, 60px);
+            grid-gap: 8px;
             margin-bottom: 1.2rem;
         }
 
         .ttt-cell {
-            width: 90px;
-            height: 90px;
+            width: 60px;
+            height: 60px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -327,11 +327,11 @@ function renderBoard() {
     if (!tttGame) return;
     tttBoard.innerHTML = '';
     const boardArr = tttGame.board.split('');
-    boardArr.forEach((cell, idx) => {
+    for (let i = 0; i < 25; i++) {
+        const cell = boardArr[i] || ' ';
         const cellDiv = document.createElement('div');
         cellDiv.className = 'ttt-cell' + (cell.trim() ? ' taken' : '');
         cellDiv.textContent = cell.trim();
-        // Only allow move if it's your turn, cell is empty, and game is active
         if (
             tttGame.game_status === 'active' &&
             cell === ' ' &&
@@ -341,10 +341,10 @@ function renderBoard() {
             )
         ) {
             cellDiv.style.cursor = 'pointer';
-            cellDiv.onclick = () => makeMove(idx);
+            cellDiv.onclick = () => makeMove(i);
         }
         tttBoard.appendChild(cellDiv);
-    });
+    }
 
     // Status message
     if (tttGame.game_status === 'active') {
