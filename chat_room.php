@@ -290,6 +290,9 @@ if (!$chat_room) {
 <!-- Wordle Game Button -->
 <button id="start-wordle" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Wordle</button>
 
+<!-- Hangman Game Button -->
+<button id="start-hangman" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Hangman</button>
+
 <!-- Tic-Tac-Toe Overlay and Game -->
 <div id="ttt-overlay">
     <div id="tictactoe-container">
@@ -342,8 +345,25 @@ if (!$chat_room) {
     </div>
 </div>
 
+<!-- Hangman Game Overlay -->
+<div id="hangman-overlay" style="display:none; position:fixed; z-index:1000; left:0;top:0;right:0;bottom:0; background:rgba(255,255,200,0.3); justify-content:center; align-items:center;">
+    <div id="hangman-container" style="background:#fffbe6; border:3px solid #e0c878; border-radius:18px; padding:2.5rem; min-width:420px; min-height:340px; display:flex; flex-direction:column; align-items:center;">
+        <div id="hangman-word" style="font-size:2rem; letter-spacing:0.5rem; margin-bottom:1.2rem;"></div>
+        <div id="hangman-letters" style="margin-bottom:1rem;"></div>
+        <div id="hangman-status" style="font-size:1.1rem; color:#5a3b00; font-weight:bold; margin-bottom:1rem;"></div>
+        <form id="hangman-form" style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+            <input type="text" id="hangman-input" maxlength="1" style="font-size:1.5rem; text-transform:uppercase; padding:0.5rem; border:2px solid #e0c878; border-radius:8px;">
+            <button type="submit" style="background-color:#fff4a3; border:2px solid #e0c878; color:#5a3b00; padding:0.5rem 1.2rem; border-radius:8px; font-weight:bold; box-shadow:2px 2px 3px rgba(0,0,0,0.08); cursor:pointer; font-size:1rem;">Guess</button>
+        </form>
+        <div style="text-align:center;">
+            <button id="hangman-restart" style="margin:18px 10px 0 10px;">Restart Game</button>
+            <button id="hangman-leave" style="margin:18px 10px 0 10px;">Leave Game</button>
+        </div>
+    </div>
+</div>
+
 <!-- Add your WAV file -->
-<audio id="message-sound" src="sounds/randomg.wav" preload="auto"></audio>
+<audio id="message-sound" src="sounds/random.wav" preload="auto"></audio>
 
 <script>
 const chatBox = document.getElementById('chat-box');
@@ -495,7 +515,11 @@ messageForm.addEventListener('submit', function(e) {
     }).then(() => {
         messageInput.value = '';
         fetchMessages();
-        messageSound.play(); // Play sound after the message is sent
+        // Play sound after sending message
+        if (messageSound) {
+            messageSound.currentTime = 0;
+            messageSound.play();
+        }
     });
 });
 
@@ -959,25 +983,133 @@ wordleLeave.style.cursor = "pointer";
 wordleLeave.style.fontSize = "1rem";
 wordleLeave.onmouseover = () => wordleLeave.style.backgroundColor = "#ffec88";
 wordleLeave.onmouseout = () => wordleLeave.style.backgroundColor = "#fff4a3";
+
+// --- Hangman Game Logic ---
+const startHangmanButton = document.getElementById('start-hangman');
+const hangmanOverlay = document.getElementById('hangman-overlay');
+const hangmanWord = document.getElementById('hangman-word');
+const hangmanLetters = document.getElementById('hangman-letters');
+const hangmanStatus = document.getElementById('hangman-status');
+const hangmanForm = document.getElementById('hangman-form');
+const hangmanInput = document.getElementById('hangman-input');
+const hangmanRestart = document.getElementById('hangman-restart');
+const hangmanLeave = document.getElementById('hangman-leave');
+
+let hangmanGame = null;
+let hangmanInterval = null;
+
+startHangmanButton.addEventListener('click', () => {
+    document.body.querySelectorAll('header, #chat-box, #message-form, #start-tictactoe, #start-connect4, #start-memory, #start-wordle, #start-hangman').forEach(el => {
+        el.classList.add('blur-bg');
+    });
+    hangmanOverlay.style.display = 'flex';
+    startHangmanButton.style.display = 'none';
+    fetchHangman();
+    if (hangmanInterval) clearInterval(hangmanInterval);
+    hangmanInterval = setInterval(fetchHangman, 2000);
+});
+
+hangmanRestart.addEventListener('click', () => {
+    fetch('hangman_restart.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `room_id=${roomId}`
+    })
+    .then(res => res.json())
+    .then(() => {
+        fetchHangman();
+    });
+});
+
+hangmanLeave.addEventListener('click', () => {
+    document.body.querySelectorAll('header, #chat-box, #message-form, #start-tictactoe, #start-connect4, #start-memory, #start-wordle, #start-hangman').forEach(el => {
+        el.classList.remove('blur-bg');
+    });
+    hangmanOverlay.style.display = 'none';
+    startHangmanButton.style.display = '';
+    if (hangmanInterval) clearInterval(hangmanInterval);
+});
+
+function fetchHangman() {
+    fetch('hangman_get.php?room_id=' + roomId)
+        .then(res => res.json())
+        .then(game => {
+            hangmanGame = game;
+            renderHangman();
+        });
+}
+
+function renderHangman() {
+    if (!hangmanGame) return;
+    // Show word with underscores for unguessed letters
+    let displayWord = '';
+    for (let ch of hangmanGame.word) {
+        displayWord += hangmanGame.guessed.includes(ch) ? ch + ' ' : '_ ';
+    }
+    hangmanWord.textContent = displayWord.trim();
+
+    // Show guessed letters
+    hangmanLetters.textContent = "Guessed: " + (hangmanGame.guessed.length ? hangmanGame.guessed.join(' ') : '-');
+
+    // Status
+    if (hangmanGame.status === 'won') {
+        hangmanStatus.textContent = "🎉 You guessed it! The word was " + hangmanGame.word.toUpperCase();
+        hangmanForm.style.display = 'none';
+    } else if (hangmanGame.status === 'lost') {
+        hangmanStatus.textContent = "❌ Out of tries! The word was " + hangmanGame.word.toUpperCase();
+        hangmanForm.style.display = 'none';
+    } else {
+        hangmanStatus.textContent = `Tries left: ${hangmanGame.tries_left}`;
+        hangmanForm.style.display = '';
+    }
+}
+
+hangmanForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const letter = hangmanInput.value.trim().toUpperCase();
+    if (!letter.match(/^[A-Z]$/)) {
+        hangmanStatus.textContent = "Enter a single letter!";
+        return;
+    }
+    fetch('hangman_move.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `room_id=${roomId}&letter=${letter}`
+    })
+    .then(res => res.json())
+    .then(game => {
+        hangmanGame = game;
+        renderHangman();
+        hangmanInput.value = '';
+    });
+});
+
+// --- Hangman Game Overlay Buttons UI ---
+hangmanRestart.style.backgroundColor = "#fff4a3";
+hangmanRestart.style.border = "2px solid #e0c878";
+hangmanRestart.style.color = "#5a3b00";
+hangmanRestart.style.padding = "0.5rem 1.2rem";
+hangmanRestart.style.borderRadius = "8px";
+hangmanRestart.style.fontWeight = "bold";
+hangmanRestart.style.boxShadow = "2px 2px 3px rgba(0,0,0,0.08)";
+hangmanRestart.style.cursor = "pointer";
+hangmanRestart.style.fontSize = "1rem";
+hangmanRestart.onmouseover = () => hangmanRestart.style.backgroundColor = "#ffec88";
+hangmanRestart.onmouseout = () => hangmanRestart.style.backgroundColor = "#fff4a3";
+
+hangmanLeave.style.backgroundColor = "#fff4a3";
+hangmanLeave.style.border = "2px solid #e0c878";
+hangmanLeave.style.color = "#5a3b00";
+hangmanLeave.style.padding = "0.5rem 1.2rem";
+hangmanLeave.style.borderRadius = "8px";
+hangmanLeave.style.fontWeight = "bold";
+hangmanLeave.style.boxShadow = "2px 2px 3px rgba(0,0,0,0.08)";
+hangmanLeave.style.cursor = "pointer";
+hangmanLeave.style.fontSize = "1rem";
+hangmanLeave.onmouseover = () => hangmanLeave.style.backgroundColor = "#ffec88";
+hangmanLeave.onmouseout = () => hangmanLeave.style.backgroundColor = "#fff4a3";
 </script>
 
 </body>
 </html>
 
-<?php
-require 'includes/db.php';
-
-$room_id = $_POST['room_id'] ?? null;
-if (!$room_id) { http_response_code(400); exit; }
-
-// Delete the game for this room
-$stmt = $pdo->prepare("DELETE FROM connect4_game WHERE room_id = ?");
-$stmt->execute([$room_id]);
-
-echo json_encode(['deleted' => true]);
-
-// memory_get.php (board creation part)
-$pairs = array_merge(range('A', 'I'), range('A', 'I')); // 9 pairs for 18 tiles
-shuffle($pairs);
-$board = implode('', $pairs);
-$revealed = str_repeat('0', 18);
