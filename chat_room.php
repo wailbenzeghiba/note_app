@@ -287,6 +287,9 @@ if (!$chat_room) {
 <!-- Memory Game Button -->
 <button id="start-memory" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Memory</button>
 
+<!-- Wordle Game Button -->
+<button id="start-wordle" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Wordle</button>
+
 <!-- Tic-Tac-Toe Overlay and Game -->
 <div id="ttt-overlay">
     <div id="tictactoe-container">
@@ -319,6 +322,22 @@ if (!$chat_room) {
         <div style="text-align:center;">
             <button id="memory-restart" style="margin:18px 10px 0 10px;">Restart Game</button>
             <button id="memory-leave" style="margin:18px 10px 0 10px;">Leave Game</button>
+        </div>
+    </div>
+</div>
+
+<!-- Wordle Game Overlay -->
+<div id="wordle-overlay" style="display:none; position:fixed; z-index:1000; left:0;top:0;right:0;bottom:0; background:rgba(255,255,200,0.3); justify-content:center; align-items:center;">
+    <div id="wordle-container" style="background:#fffbe6; border:3px solid #e0c878; border-radius:18px; padding:2.5rem; min-width:420px; min-height:520px; display:flex; flex-direction:column; align-items:center;">
+        <div id="wordle-board" style="display:flex; flex-direction:column; align-items:center; margin-bottom:1.2rem;"></div>
+        <div id="wordle-message" style="text-align:center; margin-top:10px; font-size:1.2rem; color:#5a3b00; font-weight:bold; letter-spacing:1px;"></div>
+        <form id="wordle-form" style="display:flex; flex-direction:column; align-items:center; margin-top:10px;">
+            <input type="text" id="wordle-input" maxlength="5" style="font-size:1.5rem; text-transform:uppercase; padding:0.5rem; border:2px solid #e0c878; border-radius:8px; margin-bottom:10px;">
+            <button type="submit" style="background-color:#fff4a3; border:2px solid #e0c878; color:#5a3b00; padding:0.5rem 1.2rem; border-radius:8px; font-weight:bold; box-shadow:2px 2px 3px rgba(0,0,0,0.08); cursor:pointer; font-size:1rem;">Submit Guess</button>
+        </form>
+        <div style="text-align:center;">
+            <button id="wordle-restart" style="margin:18px 10px 0 10px;">Restart Game</button>
+            <button id="wordle-leave" style="margin:18px 10px 0 10px;">Leave Game</button>
         </div>
     </div>
 </div>
@@ -787,6 +806,159 @@ memoryLeave.style.cursor = "pointer";
 memoryLeave.style.fontSize = "1rem";
 memoryLeave.onmouseover = () => memoryLeave.style.backgroundColor = "#ffec88";
 memoryLeave.onmouseout = () => memoryLeave.style.backgroundColor = "#fff4a3";
+
+// --- Wordle Game Logic ---
+const startWordleButton = document.getElementById('start-wordle');
+const wordleOverlay = document.getElementById('wordle-overlay');
+const wordleBoard = document.getElementById('wordle-board');
+const wordleMessage = document.getElementById('wordle-message');
+const wordleForm = document.getElementById('wordle-form');
+const wordleInput = document.getElementById('wordle-input');
+const wordleRestart = document.getElementById('wordle-restart');
+const wordleLeave = document.getElementById('wordle-leave');
+
+let wordleGame = null;
+let wordleInterval = null;
+
+startWordleButton.addEventListener('click', () => {
+    document.body.querySelectorAll('header, #chat-box, #message-form, #start-tictactoe, #start-connect4, #start-memory, #start-wordle').forEach(el => {
+        el.classList.add('blur-bg');
+    });
+    wordleOverlay.style.display = 'flex';
+    startWordleButton.style.display = 'none';
+    fetchWordle();
+    if (wordleInterval) clearInterval(wordleInterval);
+    wordleInterval = setInterval(fetchWordle, 2000);
+});
+
+wordleRestart.addEventListener('click', () => {
+    fetch('wordle_restart.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `room_id=${roomId}`
+    })
+    .then(res => res.json())
+    .then(() => {
+        fetchWordle();
+    });
+});
+
+wordleLeave.addEventListener('click', () => {
+    document.body.querySelectorAll('header, #chat-box, #message-form, #start-tictactoe, #start-connect4, #start-memory, #start-wordle').forEach(el => {
+        el.classList.remove('blur-bg');
+    });
+    wordleOverlay.style.display = 'none';
+    startWordleButton.style.display = '';
+    if (wordleInterval) clearInterval(wordleInterval);
+});
+
+function fetchWordle() {
+    fetch('wordle_get.php?room_id=' + roomId)
+        .then(res => res.json())
+        .then(game => {
+            wordleGame = game;
+            renderWordle();
+        });
+}
+
+function renderWordle() {
+    if (!wordleGame) return;
+    wordleBoard.innerHTML = '';
+    for (let row = 0; row < 6; row++) {
+        const guess = wordleGame.guesses[row] || '';
+        const result = wordleGame.results[row] || '';
+        const rowDiv = document.createElement('div');
+        rowDiv.style.display = 'flex';
+        for (let col = 0; col < 5; col++) {
+            const letter = guess[col] ? guess[col].toUpperCase() : '';
+            const cellDiv = document.createElement('div');
+            cellDiv.style.width = '48px';
+            cellDiv.style.height = '48px';
+            cellDiv.style.margin = '2px';
+            cellDiv.style.display = 'flex';
+            cellDiv.style.alignItems = 'center';
+            cellDiv.style.justifyContent = 'center';
+            cellDiv.style.fontSize = '2rem';
+            cellDiv.style.fontWeight = 'bold';
+            cellDiv.style.border = '2px solid #e0c878';
+            cellDiv.style.borderRadius = '8px';
+            cellDiv.style.background = '#f9f6e3';
+            if (result[col] === 'G') cellDiv.style.background = '#b6e7a0'; // Green
+            else if (result[col] === 'Y') cellDiv.style.background = '#fff4a3'; // Yellow
+            else if (result[col] === 'B') cellDiv.style.background = '#e0e0e0'; // Gray
+            cellDiv.textContent = letter;
+            rowDiv.appendChild(cellDiv);
+        }
+        wordleBoard.appendChild(rowDiv);
+    }
+
+    // --- Hints and status ---
+    let hint = '';
+    if (wordleGame.status === 'won') {
+        wordleMessage.textContent = "🎉 You guessed it! The word was " + wordleGame.word.toUpperCase();
+        wordleForm.style.display = 'none';
+    } else if (wordleGame.status === 'lost') {
+        wordleMessage.textContent = "❌ Out of tries! The word was " + wordleGame.word.toUpperCase();
+        wordleForm.style.display = 'none';
+    } else {
+        // Show hints: number of guesses left and used letters
+        const guessesLeft = 6 - (wordleGame.guesses ? wordleGame.guesses.length : 0);
+        let usedLetters = '';
+        if (wordleGame.guesses && wordleGame.guesses.length > 0) {
+            usedLetters = Array.from(
+                new Set(wordleGame.guesses.join('').toUpperCase().split(''))
+            ).sort().join(' ');
+        }
+        hint = `Guesses left: ${guessesLeft}` + (usedLetters ? ` | Used letters: ${usedLetters}` : '');
+        wordleMessage.textContent = "Guess the 5-letter word!" + (hint ? " | " + hint : "");
+        wordleForm.style.display = '';
+    }
+}
+
+wordleForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const guess = wordleInput.value.trim().toUpperCase();
+    if (guess.length !== 5) {
+        wordleMessage.textContent = "Enter a 5-letter word!";
+        return;
+    }
+    fetch('wordle_move.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `room_id=${roomId}&guess=${guess}`
+    })
+    .then(res => res.json())
+    .then(game => {
+        wordleGame = game;
+        renderWordle();
+        wordleInput.value = ''; // <-- Only clear after submit
+    });
+});
+
+// --- Wordle Game Overlay Buttons UI ---
+wordleRestart.style.backgroundColor = "#fff4a3";
+wordleRestart.style.border = "2px solid #e0c878";
+wordleRestart.style.color = "#5a3b00";
+wordleRestart.style.padding = "0.5rem 1.2rem";
+wordleRestart.style.borderRadius = "8px";
+wordleRestart.style.fontWeight = "bold";
+wordleRestart.style.boxShadow = "2px 2px 3px rgba(0,0,0,0.08)";
+wordleRestart.style.cursor = "pointer";
+wordleRestart.style.fontSize = "1rem";
+wordleRestart.onmouseover = () => wordleRestart.style.backgroundColor = "#ffec88";
+wordleRestart.onmouseout = () => wordleRestart.style.backgroundColor = "#fff4a3";
+
+wordleLeave.style.backgroundColor = "#fff4a3";
+wordleLeave.style.border = "2px solid #e0c878";
+wordleLeave.style.color = "#5a3b00";
+wordleLeave.style.padding = "0.5rem 1.2rem";
+wordleLeave.style.borderRadius = "8px";
+wordleLeave.style.fontWeight = "bold";
+wordleLeave.style.boxShadow = "2px 2px 3px rgba(0,0,0,0.08)";
+wordleLeave.style.cursor = "pointer";
+wordleLeave.style.fontSize = "1rem";
+wordleLeave.onmouseover = () => wordleLeave.style.backgroundColor = "#ffec88";
+wordleLeave.onmouseout = () => wordleLeave.style.backgroundColor = "#fff4a3";
 </script>
 
 </body>
