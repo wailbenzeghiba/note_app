@@ -258,6 +258,43 @@ if (!$chat_room) {
             transition: background 0.2s;
             user-select: none;
         }
+
+        /* Improved Game Start Buttons - now flat and centered */
+        .game-start-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5em;
+            margin: 0.5rem 0.5rem 0 0;
+            padding: 0.7rem 1.3rem;
+            font-size: 1.1rem;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 10px;
+            border: 2px solid #e0c878;
+            background: #fff4a3;
+            color: #5a3b00;
+            box-shadow: none;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            outline: none;
+        }
+        .game-start-btn:hover, .game-start-btn:focus {
+            background: #ffec88;
+            transform: translateY(-2px) scale(1.04);
+        }
+        .game-start-btn .emoji {
+            font-size: 1.3em;
+            vertical-align: middle;
+        }
+
+        /* Center the button group */
+        .game-btn-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
     </style>
 </head>
 <body>
@@ -278,20 +315,14 @@ if (!$chat_room) {
     <button type="submit">Send</button>
 </form>
 
-<!-- Tic-Tac-Toe Button -->
-<button id="start-tictactoe" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Tic-Tac-Toe</button>
-
-<!-- Connect 4 Button -->
-<button id="start-connect4" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Connect 4</button>
-
-<!-- Memory Game Button -->
-<button id="start-memory" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Memory</button>
-
-<!-- Wordle Game Button -->
-<button id="start-wordle" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Wordle</button>
-
-<!-- Hangman Game Button -->
-<button id="start-hangman" style="margin-top: 1rem; background-color: #ffec88; padding: 0.5rem; border-radius: 6px;">Start Hangman</button>
+<!-- Replace the game start buttons markup -->
+<div class="game-btn-row">
+    <button id="start-tictactoe" class="game-start-btn"><span class="emoji">❌⭕</span> Start Tic-Tac-Toe</button>
+    <button id="start-connect4" class="game-start-btn"><span class="emoji">🟡🔴</span> Start Connect 4</button>
+    <button id="start-memory" class="game-start-btn"><span class="emoji">🧠</span> Start Memory</button>
+    <button id="start-wordle" class="game-start-btn"><span class="emoji">🔤</span> Start Wordle</button>
+    <button id="start-hangman" class="game-start-btn"><span class="emoji">⚰️</span> Start Hangman</button>
+</div>
 
 <!-- Tic-Tac-Toe Overlay and Game -->
 <div id="ttt-overlay">
